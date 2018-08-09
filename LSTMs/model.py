@@ -1,9 +1,12 @@
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout, Flatten
 from keras.layers import LSTM
+from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
 import numpy as np
 import os
+
+
 
 
 class LSTMs:
@@ -19,64 +22,81 @@ class LSTMs:
     def __init__(self, **kwargs):
         self.timeSteps = 5
         self.feature = 1
-        self.batch_size = 1
-        self.layer_neurons = [10, 20]
+        self.batch_size = 10
+        self.layer_neurons = [10]
         self.dropout = 0
         self.response_type = 'reg'
 
         for key, value in kwargs.items():
             setattr(self, key, value)
-        print(self.layer_neurons)
         self.model = self.createLSTMs()
 
     def createLSTMs(self):
         tf.reset_default_graph()
         model = Sequential()
-
-        for key in range(len(self.layer_neurons)):
-            if key == 0:
-                model.add(
-                    LSTM(self.layer_neurons[key], input_shape=(self.timeSteps, self.feature), return_sequences=True))
-            else:
-                model.add(LSTM(self.layer_neurons[key], return_sequences=True))
+        if self.batch_size == 1:
+            for key in range(len(self.layer_neurons)):
+                if key == 0:
+                    model.add(
+                        LSTM(self.layer_neurons[key], batch_input_shape=(self.batch_size, self.timeSteps, self.feature),
+                             return_sequences=True, stateful='true'))
+                else:
+                    model.add(
+                        LSTM(self.layer_neurons[key], batch_input_shape=(self.batch_size, self.timeSteps, self.feature),
+                             return_sequences=True, stateful='true'))
+        else:
+            for key in range(len(self.layer_neurons)):
+                if key == 0:
+                    model.add(
+                        LSTM(self.layer_neurons[key], input_shape=(self.timeSteps, self.feature),
+                             return_sequences=True))
+                else:
+                    model.add(
+                        LSTM(self.layer_neurons[key], return_sequences=True))
 
         if self.dropout != 0:
             model.add(Dropout(self.dropout))
         model.add(Flatten())
-        model.add(Dense(1, activation='softsign'))
-
         if self.response_type.upper() == 'CLASSIFICATION':
             print('Building classification model...')
+            model.add(Dense(1, activation='softmax'))
             model.compile(loss='categorical_crossentropy', optimizer='RMSProp', metrics=['accuracy'])
-            return model
         elif self.response_type.upper() == 'REG':
             print('Building regression model...')
-            model.compile(loss='mean_squared_error', optimizer='RMSProp')
-            return model
+            model.add(Dense(1, activation='linear'))
+            model.compile(loss='mean_squared_error', optimizer='adam')
         else:
             print('> error: wrong response_type')
+        print(model.summary())
+        return model
 
     def get_model(self):
         return self.model
 
     def save_model_weight(self, filename):
         # save model para to file
-        net_para_file = 'LSTMs/Model_Weight_Data/' + filename + '.h5'
+        net_para_file = 'Model_Weight_Data/' + filename + '.h5'
         self.model.save_weights(net_para_file)
 
     def load_model_weight(self, filename):
         # load model para fro  file
-        net_para_file = 'LSTMs/Model_Weight_Data/' + filename + '.h5'
+        net_para_file = 'Model_Weight_Data/' + filename + '.h5'
         if os.path.exists(net_para_file):
             self.model.load_weights(net_para_file)
         else:
             print('> error: ' + filename + ' is not found')
 
-    def train(self, trainX, trainY, epochs=1, batch=1):
+    def train(self, trainX, trainY, epochs=1):
         for i in range(epochs):
             print(i+1)
-            self.model.fit(trainX, trainY, epochs=1, batch_input_shape=(batch, self.timeSteps, self.feature), shuffle=False)
+            self.model.fit(trainX, trainY, epochs=1, batch_size=self.batch_size, shuffle=False)
             self.model.reset_states()
+
+    def predict(self, testX, reset_stateful=0):
+        trainPredict = self.model.predict(testX, batch_size=self.batch_size)
+        if reset_stateful == 1:
+            self.model.reset_states()
+        return trainPredict
 
 
 # encode for classification
@@ -92,3 +112,28 @@ def one_hot_encode(trainY, n_label):
 # decode for encoded sequence
 def one_hot_decode(encoded_seq):
     return [np.argmax(vector) for vector in encoded_seq]
+
+
+# transform raw_data as a window dataSet
+def data_trans(raw_data, time_step):
+
+    data = np.array(raw_data)
+    window_num = data.shape[0] - time_step + 1
+    dataX = []
+    dataY = []
+    for i in range(window_num):
+        dataX.append(data[i:time_step+i, 0:data.shape[1]-1])
+        dataY.append(data[time_step+i-1, -1])
+    return np.array(dataX), np.array(dataY)
+
+
+# normalize dataSet
+def normalize(dataSet):
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    dataSet = scaler.fit_transform(dataSet)
+    return dataSet, scaler
+
+
+# invert dataSet
+def inverse(dataSet, scaler):
+    return scaler.inverse_transform(dataSet)
