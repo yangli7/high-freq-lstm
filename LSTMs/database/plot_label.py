@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-dataSet = pd.read_csv('database_SH600637_18-06-15.csv', encoding='gbk')
+dataSet = pd.read_csv('database_SH600637.csv', encoding='gbk')
 label = dataSet['5min'].values
 price = dataSet['price'].values
 
@@ -14,7 +14,7 @@ def sequence_plot(price, label):
     x = np.arange(0, label_len, 1)
     y = np.arange(100, price_len + 100, 1)
 
-    plt.figure(figsize=(50, 20))
+    plt.figure(figsize=(100, 20))
     plt.plot(x, price, label='stock price', marker='.', color='green')
     plt.plot(y, label, label='price mean', color='blue')
     plt.legend(['stock price', 'price mean'], loc='upper right')
@@ -39,3 +39,5 @@ def drawHist(data, label):
     plt.ylabel('Frequency')
     plt.title(label)
     plt.show()
+
+sequence_plot(price, label)

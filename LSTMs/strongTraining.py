@@ -1,7 +1,13 @@
+from keras.layers import LSTM
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from LSTMs import model
+
+from keras.models import Sequential
+from keras.layers.core import Dense, Flatten
+from keras.layers import LSTM
 
 '''
 feature list
@@ -11,19 +17,19 @@ feature list
 '''
 
 # parameter
-filename = 'database_SH600637_18-06-15.csv'
-feature_label_name = ['price', 'buy1', 'sale1', '5min']
+filename = 'database_SH600637.csv'
+feature_label_name = ['price', 'buy1', 'buy2', 'bc1', 'bc2', 'sale1', 'sale2', 'sc1', 'sc2', '5min']
 feature = len(feature_label_name)-1
-train_rate = 0.9
+train_rate = 0.67
 
-time_step = 2
-batch_size = 1
-layer_neurons = [10, 20]
-dropout = 0.2
+time_step = 30
+batch_size = 150
+layer_neurons = [20, 10]
+dropout = 0.4
 
-if_train = 0
-epochs = 4
-modelname = 'model(20,10,0.2)_10'
+if_train = 1
+epochs = 100
+modelname = 'model_test'
 
 
 # create trainSet & testSet
@@ -44,18 +50,27 @@ testX, testY = model.data_trans(test, time_step)
 
 
 # create model
-LSTM = model.LSTMs(timeSteps=time_step, feature=feature, batch_size=batch_size, layer_neurons=layer_neurons, dropout=dropout)
+LSTM_ = model.LSTMs(timeSteps=time_step, feature=feature, batch_size=batch_size, layer_neurons=layer_neurons, dropout=dropout)
 
 # train or load
 if if_train == 1:
-    LSTM.train(trainX, trainY, epochs)
-    LSTM.save_model_weight(modelname)
+    LSTM_.train(trainX, trainY, epochs)
+    LSTM_.save_model_weight(modelname)
+elif if_train == 2:
+    model_ = Sequential()
+    model_.add(LSTM(10, input_shape=(time_step, feature), return_sequences=True))
+    model_.add(LSTM(20, return_sequences=True))
+    model_.add(Flatten())
+    model_.add(Dense(1))
+    model_.compile(loss='mean_squared_error', optimizer='adam')
+    print(model_.summary())
+    model_.fit(trainX, trainY, epochs=4, shuffle=False)
+    LSTM_.import_model(model_)
 else:
-    LSTM.load_model_weight(modelname)
+    LSTM_.load_model_weight(modelname)
 # predict
-predict_train = LSTM.predict(trainX)
-print(predict_train, trainY)
-predict_test = LSTM.predict(testX)
+predict_train = LSTM_.predict(trainX)
+predict_test = LSTM_.predict(testX)
 
 
 # inverse
